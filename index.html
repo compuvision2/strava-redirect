@@ -1,76 +1,76 @@
-<script>
-  (function () {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const state = params.get("state");
-    const error = params.get("error");
-    const errorDescription = params.get("error_description");
-    const scope = params.get("scope");
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Strava Redirect</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding: 2rem;">
+    <h2>Strava Autorisierung</h2>
+    <p id="msg" style="margin-bottom: 2rem;">Verarbeite Antwort...</p>
 
-    // Muss mit AndroidManifest matchen
-    const appSchemeBase = "packkernel://oauth/strava/callback";
-    const androidPackage = "com.dietmar.packlist";
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        const state = params.get("state");
+        const error = params.get("error");
+        const errorDescription = params.get("error_description");
+        const scope = params.get("scope");
 
-    const msg = document.getElementById("msg");
+        const appSchemeBase = "packkernel://oauth/strava/callback";
+        const androidPackage = "com.dietmar.packlist";
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-      }[c]));
-    }
+        const msg = document.getElementById("msg");
 
-    function buildUrl(base, kv) {
-      const q = Object.entries(kv)
-        .filter(([,v]) => v !== null && v !== undefined && v !== "")
-        .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-        .join("&");
-      return q ? `${base}?${q}` : base;
-    }
+        function escapeHtml(s) {
+          return String(s).replace(/[&<>"']/g, c => ({
+            "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+          }[c]));
+        }
 
-    function goToApp(customUrl) {
-      msg.textContent = "Öffne die App…";
+        function buildUrl(base, kv) {
+          const q = Object.entries(kv)
+            .filter(([,v]) => v !== null && v !== undefined && v !== "")
+            .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+            .join("&");
+          return q ? `${base}?${q}` : base;
+        }
 
-      // 1) Direktversuch (Custom Scheme)
-      window.location.replace(customUrl);
+        function goToApp(customUrl) {
+          msg.textContent = "Öffne die PackWISE App…";
 
-      // 2) Android-Fallback via intent:// (hilft oft bei Chrome/Android)
-      setTimeout(() => {
-        const u = new URL(customUrl);
-        const intentUrl =
-          `intent://${u.host}${u.pathname}${u.search}` +
-          `#Intent;scheme=${u.protocol.replace(":", "")};package=${androidPackage};end`;
+          // 1) Direktversuch (Custom Scheme)
+          window.location.replace(customUrl);
 
-        window.location.href = intentUrl;
-      }, 250);
+          // 2) Android-Fallback via intent:// 
+          setTimeout(() => {
+            const u = new URL(customUrl);
+            const intentUrl =
+              `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(":", "")};package=${androidPackage};end`;
+            window.location.href = intentUrl;
+          }, 250);
 
-      // 3) Debug-Ausgabe, falls App nicht öffnet
-      setTimeout(() => {
-        msg.innerHTML =
-          "Falls nichts passiert: App ist evtl. nicht installiert oder der Link ist nicht registriert.<br><br>" +
-          "Debug-Infos:<br>" +
-          "<code>" + escapeHtml(customUrl) + "</code>";
-      }, 1400);
-    }
+          // 3) Fallback Button (manuell) - sehr wichtig für manche Android-Geräte!
+          setTimeout(() => {
+            msg.innerHTML =
+              "Falls die App sich nicht automatisch öffnet:<br><br>" +
+              "<a href='" + escapeHtml(customUrl) + "' style='padding: 12px 24px; background: #FC4C02; color: #fff; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px; margin-top: 10px;'>Hier klicken, um PackWISE zu öffnen</a>";
+          }, 1500);
+        }
 
-    if (error) {
-      const url = buildUrl(appSchemeBase, {
-        error,
-        error_description: errorDescription,
-        state
-      });
-      goToApp(url);
-      return;
-    }
+        if (error) {
+          goToApp(buildUrl(appSchemeBase, { error, error_description: errorDescription, state }));
+          return;
+        }
 
-    if (!code) {
-      msg.innerHTML =
-        "Kein <code>code</code> Parameter in der URL gefunden.<br>" +
-        "Wenn du die Seite manuell geöffnet hast: Das ist normal.<br><br>" +
-        "URL war: <code>" + escapeHtml(window.location.href) + "</code>";
-      return;
-    }
+        if (!code) {
+          msg.innerHTML = "Fehler: Kein Login-Code von Strava erhalten.";
+          return;
+        }
 
-    const url = buildUrl(appSchemeBase, { code, state, scope });
-    goToApp(url);
-  })();
-</script>
+        goToApp(buildUrl(appSchemeBase, { code, state, scope }));
+      })();
+    </script>
+</body>
+</html>
