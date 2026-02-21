@@ -1,6 +1,76 @@
-<!DOCTYPE html>
-<html>
-<body>
-Strava OAuth Redirect OK
-</body>
-</html>
+<script>
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    const error = params.get("error");
+    const errorDescription = params.get("error_description");
+    const scope = params.get("scope");
+
+    // Muss mit AndroidManifest matchen
+    const appSchemeBase = "packkernel://oauth/strava/callback";
+    const androidPackage = "com.dietmar.packlist";
+
+    const msg = document.getElementById("msg");
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    function buildUrl(base, kv) {
+      const q = Object.entries(kv)
+        .filter(([,v]) => v !== null && v !== undefined && v !== "")
+        .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join("&");
+      return q ? `${base}?${q}` : base;
+    }
+
+    function goToApp(customUrl) {
+      msg.textContent = "Öffne die App…";
+
+      // 1) Direktversuch (Custom Scheme)
+      window.location.replace(customUrl);
+
+      // 2) Android-Fallback via intent:// (hilft oft bei Chrome/Android)
+      setTimeout(() => {
+        const u = new URL(customUrl);
+        const intentUrl =
+          `intent://${u.host}${u.pathname}${u.search}` +
+          `#Intent;scheme=${u.protocol.replace(":", "")};package=${androidPackage};end`;
+
+        window.location.href = intentUrl;
+      }, 250);
+
+      // 3) Debug-Ausgabe, falls App nicht öffnet
+      setTimeout(() => {
+        msg.innerHTML =
+          "Falls nichts passiert: App ist evtl. nicht installiert oder der Link ist nicht registriert.<br><br>" +
+          "Debug-Infos:<br>" +
+          "<code>" + escapeHtml(customUrl) + "</code>";
+      }, 1400);
+    }
+
+    if (error) {
+      const url = buildUrl(appSchemeBase, {
+        error,
+        error_description: errorDescription,
+        state
+      });
+      goToApp(url);
+      return;
+    }
+
+    if (!code) {
+      msg.innerHTML =
+        "Kein <code>code</code> Parameter in der URL gefunden.<br>" +
+        "Wenn du die Seite manuell geöffnet hast: Das ist normal.<br><br>" +
+        "URL war: <code>" + escapeHtml(window.location.href) + "</code>";
+      return;
+    }
+
+    const url = buildUrl(appSchemeBase, { code, state, scope });
+    goToApp(url);
+  })();
+</script>
